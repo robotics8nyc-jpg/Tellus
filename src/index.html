@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>TELLUS</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body { 
+    font-family: "Century Gothic", "Inter", "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: #fce8f1; 
+    margin: 0;
+    font-size: 22px;
+    color: #333;
+}
+
+header { 
+    background: #1f1f1f; 
+    color: white; 
+    padding: 20px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    font-size: 26px;
+    font-weight: bold;
+}
+
+/* Ensure suggestion items are readable (override header color inheritance) */
+#searchSuggestions div {
+    color: #000 !important;
+}
+#file_search { 
+    padding: 10px; 
+    width: 260px; 
+    font-size: 20px;
+    border-radius: 10px;
+    border: 1px solid #bbb;
+}
+
+button { 
+    padding: 12px 20px; 
+    margin: 5px; 
+    cursor: pointer; 
+    font-size: 20px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid #ccc;
+    transition: background 0.2s ease;
+}
+
+button:hover {
+    background: #f7d4e2;
+}
+
+#fireBtn { 
+    font-size: 24px; 
+}
+
+#container { 
+    width: 85%; 
+    margin: auto; 
+    padding: 25px; 
+    text-align: center;
+}
+
+/* ---- NEW: Questions header bubble ---- */
+#questionsTitleBubble {
+    display: inline-block;
+    background: white;
+    padding: 20px 40px;
+    border-radius: 40px;
+    font-size: 36px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.10);
+}
+
+/* ---- Question bubbles ---- */
+.question, .answerBox { 
+    background: white; 
+    padding: 26px; 
+    border-radius: 25px; 
+    margin-bottom: 25px; 
+    box-shadow: 0 3px 14px rgba(0,0,0,0.12);
+    font-size: 24px;
+}
+
+.question.bubble {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    background: white;
+    padding: 26px;
+    border-radius: 30px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+    max-width: 80%;
+}
+
+/* Inputs */
+input, textarea { 
+    width: 100%; 
+    padding: 15px; 
+    margin-top: 10px; 
+    font-size: 22px;
+    border-radius: 12px; 
+    border: 1px solid #ccc; 
+}
+
+/* Modal overlays */
+.modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.45);
+    z-index: 1000;
+}
+
+.modal .question {
+    width: 92%;
+    max-width: 680px;
+    font-size: 24px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.media { 
+    margin-top: 12px; 
+    font-size: 20px;
+}
+
+/* Subsection buttons inside Add Question modal */
+.subsection-btn {
+    padding: 8px 12px;
+    font-size: 16px;
+    margin-right: 8px;
+    margin-top: 6px;
+    border-radius: 8px;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+    <!-- LEFT -->
+    <div style="flex:1;">
+        <h2>Tellus</h2>
+    </div>
+
+    <!-- CENTER SEARCH -->
+    <div style="flex:1; display:flex; justify-content:center;">
+        <div style="position:relative; width:360px;">
+            <input id="search" placeholder="Search archaeology topics...">
+
+            <div id="searchSuggestions"
+                 style="
+                    position:absolute;
+                    top:110%;
+                    left:0;
+                    width:100%;
+                    background:white;
+                    border-radius:12px;
+                    box-shadow:0 6px 18px rgba(0,0,0,0.15);
+                    z-index:999;
+                    display:none;
+                    text-align:left;
+                    max-height:300px;
+                    overflow-y:auto;
+                 ">
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div style="flex:1; display:flex; justify-content:flex-end; gap:10px;">
+        <button id="fireBtn">🔥 Trending</button>
+
+        <!-- NEW: Topic-only trending -->
+        <button id="topicTrendingBtn" class="hidden">
+            🔥 Trending (This Topic)
+        </button>
+
+        <button id="addBtn">Make a Question</button>
+        <button id="profileBtn">👤 Profile</button>
+    </div>
+</header>
+
+<div id="container">
+    <div id="questionsTitleBubble">Questions</div>
+    <div id="aiHeadline" style="margin-bottom: 20px; font-style: italic; color: #555;"></div>
+    <div id="questions"></div>
+</div>
+
+<!-- Add Question Modal -->
+<div id="addModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
+    <div class="question">
+        <h3 id="addModalTitle">Create a Question</h3>
+        <input id="qUser" placeholder="Your name">
+        <textarea id="qText" placeholder="Your question..."></textarea>
+        <input id="qMedia" placeholder="Image/Video/Link URL (optional)">
+        <select id="qTopicSelect" style="margin-top:10px;">
+            <option value="">📚 Choose a topic</option>
+        </select>
+        
+        <button onclick="submitQuestion()">Submit Question</button>
+        <button onclick="closeModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Add Answer Modal -->
+<div id="answerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="answerModalTitle">
+    <div class="question">
+        <h3 id="answerModalTitle">Write an Answer</h3>
+        <input id="aUser" placeholder="Your name">
+        <textarea id="aText" placeholder="Your comment..."></textarea>
+        <input id="aMedia" placeholder="Image/Video/Link URL (optional)">
+        <button id="answerSubmitBtn">Submit Answer</button>
+        <button onclick="closeAnswerModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- ⭐ USER PROFILE MODAL -->
+<div id="profileModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="question" style="position:relative;">
+
+        <!-- X BUTTON -->
+        <button onclick="closeProfileModal()" 
+            style="
+                position:absolute;
+                top:15px;
+                right:20px;
+                font-size:32px;
+                background:none;
+                border:none;
+                cursor:pointer;
+            ">
+            ✖
+        </button>
+
+        <h3>User Profile</h3>
+
+        <div id="profileLoggedOut">
+            <input id="loginName" placeholder="Enter username">
+
+            <!-- Country dropdown -->
+            <select id="countrySelect">
+                <option value="">🌐 Select your country</option>
+            </select>
+
+            <button onclick="loginUser()">Sign In</button>
+        </div>
+
+        <div id="profileLoggedIn" class="hidden">
+            <p><b>Logged in as:</b> <span id="displayUser"></span></p>
+            <button onclick="logoutUser()">Log Out</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// Save all questions to localStorage
+function saveQuestionsToStorage() {
+    try {
+        localStorage.setItem("tellus_questions", JSON.stringify(window.fullData));
+    } catch (e) {
+        console.warn("LocalStorage save failed:", e);
+    }
+}
+let currentAnsweringID = null;
+// load currentUser from localStorage so ownership survives reloads
+let currentUser = localStorage.getItem('tellus_currentUser') || ""; // keeps track of who can edit/delete
+
+// Track which posts each user has voted on
+let voteHistory = JSON.parse(localStorage.getItem("tellus_voteHistory") || "{}");
+
+function saveVoteHistory() {
+    localStorage.setItem("tellus_voteHistory", JSON.stringify(voteHistory));
+}
+
+// Track the current topic (search) state and its results
+let currentTopic = null;
+let currentTopicResults = [];
+
+// Whether the app is currently in a topic search/mode
+let isTopicMode = false;
+
+// Guard to prevent the input handler from reacting when the user
+// selects a suggestion from the popup. This avoids the double-init
+// race where the click handler and the input handler both set
+// topic state differently and overwrite each other.
+let isSelectingSuggestion = false;
+
+// Centralized sync: keep topic UI consistent
+function syncTopicUI() {
+    const topicBtn = document.getElementById("topicTrendingBtn");
+    if (!topicBtn) return;
+
+    if (isTopicMode && currentTopic && currentTopicResults && currentTopicResults.length > 0) {
+        topicBtn.classList.remove("hidden");
+    } else {
+        topicBtn.classList.add("hidden");
+    }
+}
+
+// Full country list with flag emojis
+const countriesWithEmojis = {
+    "Afghanistan":"🇦🇫","Albania":"🇦🇱","Algeria":"🇩🇿","Andorra":"🇦🇩","Angola":"🇦🇴",
+    "Antigua and Barbuda":"🇦🇬","Argentina":"🇦🇷","Armenia":"🇦🇲","Australia":"🇦🇺","Austria":"🇦🇹",
+    "Azerbaijan":"🇦🇿","Bahamas":"🇧🇸","Bahrain":"🇧🇭","Bangladesh":"🇧🇩","Barbados":"🇧🇧",
+    "Belarus":"🇧🇾","Belgium":"🇧🇪","Belize":"🇧🇿","Benin":"🇧🇯","Bhutan":"🇧🇹",
+    "Bolivia":"🇧🇴","Bosnia and Herzegovina":"🇧🇦","Botswana":"🇧🇼","Brazil":"🇧🇷","Brunei":"🇧🇳",
+    "Bulgaria":"🇧🇬","Burkina Faso":"🇧🇫","Burundi":"🇧🇮","Cabo Verde":"🇨🇻","Cambodia":"🇰🇭",
+    "Cameroon":"🇨🇲","Canada":"🇨🇦","Central African Republic":"🇨🇫","Chad":"🇹🇩","Chile":"🇨🇱",
+    "China":"🇨🇳","Colombia":"🇨🇴","Comoros":"🇰🇲","Congo, Democratic Republic of the":"🇨🇩","Congo, Republic of the":"🇨🇬",
+    "Costa Rica":"🇨🇷","Côte d’Ivoire":"🇨🇮","Croatia":"🇭🇷","Cuba":"🇨🇺","Cyprus":"🇨🇾",
+    "Czech Republic (Czechia)":"🇨🇿","Denmark":"🇩🇰","Djibouti":"🇩🇯","Dominica":"🇩🇲","Dominican Republic":"🇩🇴",
+    "Ecuador":"🇪🇨","Egypt":"🇪🇬","El Salvador":"🇸🇻","Equatorial Guinea":"🇬🇶","Eritrea":"🇪🇷",
+    "Estonia":"🇪🇪","Eswatini":"🇸🇿","Ethiopia":"🇪🇹","Fiji":"🇫🇯","Finland":"🇫🇮",
+    "France":"🇫🇷","Gabon":"🇬🇦","Gambia":"🇬🇲","Georgia":"🇬🇪","Germany":"🇩🇪",
+    "Ghana":"🇬🇭","Greece":"🇬🇷","Grenada":"🇬🇩","Guatemala":"🇬🇹","Guinea":"🇬🇳",
+    "Guinea-Bissau":"🇬🇼","Guyana":"🇬🇾","Haiti":"🇭🇹","Honduras":"🇭🇳","Hungary":"🇭🇺",
+    "Iceland":"🇮🇸","India":"🇮🇳","Indonesia":"🇮🇩","Iran":"🇮🇷","Iraq":"🇮🇶",
+    "Ireland":"🇮🇪","Israel":"🇮🇱","Italy":"🇮🇹","Jamaica":"🇯🇲","Japan":"🇯🇵",
+    "Jordan":"🇯🇴","Kazakhstan":"🇰🇿","Kenya":"🇰🇪","Kiribati":"🇰🇮","Korea, North":"🇰🇵",
+    "Korea, South":"🇰🇷","Kuwait":"🇰🇼","Kyrgyzstan":"🇰🇬","Laos":"🇱🇦","Latvia":"🇱🇻",
+    "Lebanon":"🇱🇧","Lesotho":"🇱🇸","Liberia":"🇱🇷","Libya":"🇱🇾","Liechtenstein":"🇱🇮",
+    "Lithuania":"🇱🇹","Luxembourg":"🇱🇺","Madagascar":"🇲🇬","Malawi":"🇲🇼","Malaysia":"🇲🇾",
+    "Maldives":"🇲🇻","Mali":"🇲🇱","Malta":"🇲🇹","Marshall Islands":"🇲🇭","Mauritania":"🇲🇷",
+    "Mauritius":"🇲🇺","Mexico":"🇲🇽","Micronesia":"🇫🇲","Moldova":"🇲🇩","Monaco":"🇲🇨",
+    "Mongolia":"🇲🇳","Montenegro":"🇲🇪","Morocco":"🇲🇦","Mozambique":"🇲🇿","Myanmar":"🇲🇲",
+    "Namibia":"🇳🇦","Nauru":"🇳🇷","Nepal":"🇳🇵","Netherlands":"🇳🇱","New Zealand":"🇳🇿",
+    "Nicaragua":"🇳🇮","Niger":"🇳🇪","Nigeria":"🇳🇬","North Macedonia":"🇲🇰","Norway":"🇳🇴",
+    "Oman":"🇴🇲","Pakistan":"🇵🇰","Palau":"🇵🇼","Panama":"🇵🇦","Papua New Guinea":"🇵🇬",
+    "Paraguay":"🇵🇾","Peru":"🇵🇪","Philippines":"🇵🇭","Poland":"🇵🇱","Portugal":"🇵🇹",
+    "Qatar":"🇶🇦","Romania":"🇷🇴","Russia":"🇷🇺","Rwanda":"🇷🇼","Saint Kitts and Nevis":"🇰🇳",
+    "Saint Lucia":"🇱🇨","Saint Vincent and the Grenadines":"🇻🇨","Samoa":"🇼🇸","San Marino":"🇸🇲","São Tomé and Príncipe":"🇸🇹",
+    "Saudi Arabia":"🇸🇦","Senegal":"🇸🇳","Serbia":"🇷🇸","Seychelles":"🇸🇨","Sierra Leone":"🇸🇱",
+    "Singapore":"🇸🇬","Slovakia":"🇸🇰","Slovenia":"🇸🇮","Solomon Islands":"🇸🇧","Somalia":"🇸🇴",
+    "South Africa":"🇿🇦","South Sudan":"🇸🇸","Spain":"🇪🇸","Sri Lanka":"🇱🇰","Sudan":"🇸🇩",
+    "Suriname":"🇸🇷","Sweden":"🇸🇪","Switzerland":"🇨🇭","Syria":"🇸🇾","Taiwan":"🇹🇼",
+    "Tajikistan":"🇹🇯","Tanzania":"🇹🇿","Thailand":"🇹🇭","Timor-Leste":"🇹🇱","Togo":"🇹🇬",
+    "Tonga":"🇹🇴","Trinidad and Tobago":"🇹🇹","Tunisia":"🇹🇳","Turkey":"🇹🇷","Turkmenistan":"🇹🇲",
+    "Tuvalu":"🇹🇻","Uganda":"🇺🇬","Ukraine":"🇺🇦","United Arab Emirates":"🇦🇪","United Kingdom":"🇬🇧",
+    "United States":"🇺🇸","Uruguay":"🇺🇾","Uzbekistan":"🇺🇿","Vanuatu":"🇻🇺","Vatican City":"🇻🇦",
+    "Venezuela":"🇻🇪","Vietnam":"🇻🇳","Yemen":"🇾🇪","Zambia":"🇿🇲","Zimbabwe":"🇿🇼"
+};
+
+// Archaeology topic suggestions
+const archaeologyTopics = [
+    // Ancient Civilizations
+    "Daily life in ancient Mesopotamia",
+    "Urban planning in ancient cities",
+    "Collapse of the Maya civilization",
+    "Social hierarchy in ancient Egypt",
+    "Trade networks of the Roman Empire",
+    "Ancient Greek city-states",
+    "Indus Valley civilization",
+    "Phoenician trade routes",
+    "Assyrian empire warfare",
+
+    // Archaeological Methods
+    "How archaeology works",
+    "Artifact analysis",
+    "Ground penetrating radar",
+    "DNA analysis in archaeology",
+    "Radiocarbon dating",
+    "Stratigraphy",
+    "Remote sensing archaeology",
+
+    // Specializations
+    "Underwater archaeology",
+    "Maritime archaeology",
+    "Landscape archaeology",
+    "Experimental archaeology",
+
+    // Preservation
+    "Preservation of artifacts",
+    "Conservation techniques",
+    "Museum curation",
+    "Ethics in archaeology",
+
+    // Sites & Discoveries
+    "Pompeii excavations",
+    "Tutankhamun's tomb",
+    "Stonehenge",
+    "Göbekli Tepe",
+    "Machu Picchu",
+    "Terracotta Army",
+
+    // Human Origins
+    "Human evolution",
+    "Paleolithic societies",
+    "Neolithic revolution",
+    "Early hunter-gatherers",
+
+    // Society & Culture
+    "Ancient religion and rituals",
+    "Burial practices",
+    "Ancient warfare",
+    "Ancient trade systems",
+    "Writing systems in ancient societies"
+];
+
+// Populate the topic select inside Add Question modal with archaeology topics
+const topicSelect = document.getElementById('qTopicSelect');
+if (topicSelect) {
+    archaeologyTopics.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        topicSelect.appendChild(opt);
+    });
+}
+
+// Populate the country dropdown (name + emoji)
+const countrySelect = document.getElementById("countrySelect");
+if (countrySelect) {
+    for (const [name, emoji] of Object.entries(countriesWithEmojis)) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = `${emoji} ${name}`;
+        countrySelect.appendChild(option);
+    }
+    // Restore previous selection if exists
+    const savedCountryName = localStorage.getItem('tellus_userCountry');
+    if (savedCountryName) countrySelect.value = savedCountryName;
+}
+
+// Fetch and display questions
+function loadQuestions(list = null) {
+    const container = document.getElementById("questions");
+    container.innerHTML = "";
+    const data = list || window.fullData || [];
+
+    data.forEach(q => {
+        const div = document.createElement("div");
+        div.className = "question bubble";
+
+        // determine flag for this question (if present)
+        const flag = q.country ? (countriesWithEmojis[q.country] || "") : "";
+
+        let controls = "";
+        if (q.user === currentUser) {
+            controls = `
+                <div style="margin-top:8px;">
+                    <button onclick="editQuestion(${q.id})" style="font-size:14px;padding:4px 8px;">Edit</button>
+                    <button onclick="deleteQuestion(${q.id})" style="font-size:14px;padding:4px 8px;">Delete</button>
+                </div>
+            `;
+        }
+
+        div.innerHTML = `
+            <b>${q.user} ${flag}:</b> ${q.text}
+            <div class="media">${renderMedia(q.media)}</div>
+            <div style="margin:10px 0;">
+                <button onclick="vote(${q.id}, 1)">⬆ Upvote</button>
+                <button onclick="vote(${q.id}, -1)">⬇ Downvote</button>
+                <span style="font-size:20px; margin-left:10px;">Score: ${q.votes}</span>
+            </div>
+            ${controls}
+            <br>
+            <button onclick="openAnswers(${q.id})">View Answers (${q.answers.length})</button>
+        `;
+        container.appendChild(div);
+    });
+
+    // Ensure topic UI is consistent after any redraw
+    syncTopicUI();
+}
+
+function renderMedia(mediaList) {
+    if (!mediaList) return "";
+    return mediaList.map(m => `<a href="${m}" target="_blank">${m}</a><br>`).join("");
+}
+
+// Load saved questions from localStorage
+const saved = localStorage.getItem("tellus_questions");
+if (saved) {
+    window.fullData = JSON.parse(saved);
+    // Ensure old questions have votes property
+    window.fullData.forEach(q => {
+        if (q.votes === undefined) q.votes = 0;
+        // normalize legacy 'general' to empty string and fill missing topic
+        if (q.topic === undefined) q.topic = '';
+        if (q.topic === 'general') q.topic = '';
+    });
+    loadQuestions();
+} else {
+    // fallback to server
+    fetch("/api/questions")
+        .then(res => res.json())
+        .then(data => { window.fullData = data; saveQuestionsToStorage(); loadQuestions(); })
+        .catch(() => { window.fullData = []; loadQuestions(); });
+}
+
+// Smart search with autocomplete suggestions
+const searchInput = document.getElementById("search");
+const suggestionsBox = document.getElementById("searchSuggestions");
+
+searchInput.addEventListener("input", e => {
+    // If a suggestion click is in progress, ignore this input event.
+    // This prevents the click handler from being immediately overwritten
+    // by the input handler (race condition described in the report).
+    if (isSelectingSuggestion) return;
+    const term = e.target.value.toLowerCase().trim();
+    suggestionsBox.innerHTML = "";
+
+    if (!term) {
+        suggestionsBox.style.display = "none";
+        // clear topic mode when search is empty
+        currentTopic = null;
+        currentTopicResults = [];
+        isTopicMode = false;
+        loadQuestions(window.fullData);
+        return;
+    }
+
+    // 1. Filter questions
+    const filteredQuestions = (window.fullData || []).filter(q =>
+        // show untopiced (legacy/general) posts always, topic-linked posts only when they match the text
+        (q.topic === '' || q.topic === 'general') || q.text.toLowerCase().includes(term)
+    );
+
+    loadQuestions(filteredQuestions);
+
+    // Track topic state and ENTER topic mode
+    currentTopic = term;
+    currentTopicResults = filteredQuestions;
+    isTopicMode = true;
+    syncTopicUI();
+
+    // 2. Topic recommendations
+    const matches = archaeologyTopics.filter(topic =>
+        topic.toLowerCase().includes(term)
+    ).slice(0, 8);
+
+    if (matches.length === 0) {
+        suggestionsBox.style.display = "none";
+        return;
+    }
+
+    matches.forEach(topic => {
+        const div = document.createElement("div");
+        div.textContent = topic;
+        div.style.padding = "12px 16px";
+        div.style.cursor = "pointer";
+        div.style.fontSize = "18px";
+
+        div.onmouseenter = () => div.style.background = "#f7d4e2";
+        div.onmouseleave = () => div.style.background = "white";
+
+        div.onclick = () => {
+            // prevent the input handler from reacting to the programmatic
+            // value change that happens when the suggestion is clicked.
+            isSelectingSuggestion = true;
+
+            searchInput.value = topic;
+            suggestionsBox.style.display = "none";
+
+            // Show related questions if any
+            const topicResults = (window.fullData || []).filter(q =>
+                q.text.toLowerCase().includes(topic.toLowerCase())
+            );
+
+            // 🔒 ENTER TOPIC MODE ONCE (set state before render)
+            isTopicMode = true;
+            currentTopic = topic;
+            currentTopicResults = topicResults;
+
+            // render (loadQuestions calls syncTopicUI internally)
+            loadQuestions(topicResults);
+
+            document.getElementById("aiHeadline").innerText = `🔎 Topic: ${topic}`;
+
+            // Allow the input handler to run again after this click finishes.
+            // setTimeout 0 ensures any immediate input events (from value set)
+            // are ignored until we've finished applying topic state.
+            setTimeout(() => { isSelectingSuggestion = false; }, 0);
+        };
+
+        suggestionsBox.appendChild(div);
+    });
+
+    suggestionsBox.style.display = "block";
+});
+
+    // Trigger search when user presses Enter (search executes on Enter)
+    searchInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            const term = searchInput.value.toLowerCase().trim();
+            if (!term) return;
+
+            suggestionsBox.style.display = "none";
+
+            const results = (window.fullData || []).filter(q =>
+                (q.topic === '' || q.topic === 'general') || q.text.toLowerCase().includes(term)
+            );
+
+            loadQuestions(results);
+
+            currentTopic = term;
+            currentTopicResults = results;
+
+            // keep topic button visible
+            const topicBtn = document.getElementById("topicTrendingBtn");
+            if (topicBtn && results.length > 0) {
+                topicBtn.classList.remove("hidden");
+            }
+
+            document.getElementById("aiHeadline").innerText =
+                `🔎 Topic: ${term}`;
+        }
+    });
+
+// Hide suggestions when clicking elsewhere
+document.addEventListener("click", e => {
+    if (!searchInput.contains(e.target)) {
+        suggestionsBox.style.display = "none";
+    }
+});
+
+// Trending (sort by answers count + show real archaeology news)
+// Trending = sort by MOST UPVOTES (highest votes first)
+document.getElementById("fireBtn").onclick = () => {
+    // Exit topic mode when showing global trending
+    isTopicMode = false;
+    currentTopic = null;
+    currentTopicResults = [];
+
+    const sorted = [...(window.fullData || [])].sort((a, b) => b.votes - a.votes);
+    loadQuestions(sorted);
+    document.getElementById("aiHeadline").innerHTML =
+        "🔥 Showing the most upvoted posts!";
+};
+
+// Topic-specific trending button: sort only posts in the current topic
+document.getElementById("topicTrendingBtn").onclick = () => {
+    if (!currentTopicResults || currentTopicResults.length === 0) return;
+
+    // sort in-place the topic results and re-render — keep topic mode active
+    currentTopicResults = [...currentTopicResults].sort((a, b) => b.votes - a.votes);
+    loadQuestions(currentTopicResults);
+
+    document.getElementById("aiHeadline").innerHTML =
+        `🔥 Trending in topic: <b>${currentTopic}</b>`;
+
+    // Ensure UI shows the topic button and headline after sorting
+    syncTopicUI();
+};
+
+
+
+// Open Add Question
+document.getElementById("addBtn").addEventListener("click", () => {
+    if (!currentUser) {
+        alert("You must be signed in to post.");
+        return;
+    }
+
+    // autofill username
+    document.getElementById("qUser").value = currentUser;
+
+    document.getElementById("addModal").classList.remove("hidden");
+    setTimeout(() => document.getElementById("qText").focus(), 80);
+});
+
+
+function closeModal() {
+    document.getElementById("addModal").classList.add("hidden");
+    document.getElementById("addBtn").setAttribute("aria-expanded","false");
+}
+
+// Submit Question
+function submitQuestion() {
+    const user = document.getElementById("qUser").value || "Anonymous";
+    const userCountry = localStorage.getItem('tellus_userCountry') || ""; // store country
+    currentUser = user; // store the current user
+    try { localStorage.setItem('tellus_currentUser', currentUser); } catch (e) { console.warn('localStorage not available', e); }
+    const text = document.getElementById("qText").value;
+    const media = document.getElementById("qMedia").value
+        ? [document.getElementById("qMedia").value]
+        : [];
+
+    // capture topic choice from modal (specific topic or empty)
+    const topicChoice = (document.getElementById("qTopicSelect") && document.getElementById("qTopicSelect").value) || "";
+
+    // build new question object
+    const newQ = {
+        id: Date.now(),
+        user,
+        country: userCountry,
+        text,
+        // prefer explicit topic choice from the modal, otherwise fall back to currentTopic
+        topic: topicChoice || currentTopic || '',
+        // no subsection field (removed)
+        media,
+        answers: [],
+        votes: 0
+    };
+
+
+    // add to local data (in-memory)
+    window.fullData = window.fullData || [];
+    window.fullData.unshift(newQ);
+    // save permanently
+    saveQuestionsToStorage();
+
+    // display bubble at top with optional controls for the current user
+    const container = document.getElementById("questions");
+    const div = document.createElement("div");
+    div.className = "question bubble";
+
+    let controls = "";
+    if (newQ.user === currentUser) {
+        controls = `
+            <div style="margin-top:8px;">
+                <button onclick="editQuestion(${newQ.id})" style="font-size:14px;padding:4px 8px;">Edit</button>
+                <button onclick="deleteQuestion(${newQ.id})" style="font-size:14px;padding:4px 8px;">Delete</button>
+            </div>
+        `;
+    }
+    const flag = newQ.country ? (countriesWithEmojis[newQ.country] || "") : "";
+
+    div.innerHTML = `
+        <b>${newQ.user} ${flag}:</b> ${newQ.text}
+        <div class="media">${renderMedia(newQ.media)}</div>
+        ${controls}
+        <br>
+        <button onclick="openAnswers(${newQ.id})">Show Answers</button>
+    `;
+    container.prepend(div);
+
+    // POST to server to persist (best-effort). Server accepts client id.
+    fetch('/api/addQuestion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newQ)
+    }).then(res => res.json())
+      .then(resp => {
+          if (resp && resp.id && resp.id !== newQ.id) {
+              // If server assigned a different id, update local store
+              const idx = (window.fullData || []).findIndex(x => x.id === newQ.id);
+              if (idx !== -1) window.fullData[idx].id = resp.id;
+              newQ.id = resp.id;
+          }
+      }).catch(err => console.warn('Failed to save question to server', err));
+
+    // close modal + clear fields
+    closeModal();
+    document.getElementById("qUser").value = "";
+    document.getElementById("qText").value = "";
+    document.getElementById("qMedia").value = "";
+}
+
+
+// View Answers + respond
+function openAnswers(id) {
+    const q = (window.fullData || []).find(x => x.id === id);
+    if (!q) return;
+    const container = document.getElementById("questions");
+
+    const qFlag = q.country ? (countriesWithEmojis[q.country] || "") : "";
+    container.innerHTML = `
+        <button onclick="loadQuestions(currentTopic ? currentTopicResults : window.fullData); syncTopicUI();">⬅ Back to Questions</button>
+        <h3>${q.user} ${qFlag}: ${q.text}</h3>
+        <div class="media">${renderMedia(q.media)}</div>
+        <button onclick="openAnswerModal(${id})">Write an Answer</button>
+        <h4>Answers:</h4>
+    `;
+
+    q.answers.forEach(a => {
+        const div = document.createElement("div");
+        div.className = "answerBox";
+        const aFlag = a.country ? (countriesWithEmojis[a.country] || "") : "";
+        div.innerHTML = `
+            <b>${a.user} ${aFlag}:</b> ${a.text}
+            <div class="media">${renderMedia(a.media)}</div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Open answer modal
+function openAnswerModal(id) {
+    currentAnsweringID = id;
+    const title = document.getElementById("answerModalTitle");
+    if (title) title.innerText = "Write a Comment";
+    document.getElementById("answerModal").classList.remove("hidden");
+}
+
+function closeAnswerModal() {
+    document.getElementById("answerModal").classList.add("hidden");
+}
+
+// Submit answer (update locally without reloading)
+document.getElementById("answerSubmitBtn").onclick = () => {
+    const user = document.getElementById("aUser").value || "Anonymous";
+    const userCountry = localStorage.getItem('tellus_userCountry') || "";
+    const text = document.getElementById("aText").value;
+    const media = document.getElementById("aMedia").value ? [document.getElementById("aMedia").value] : [];
+
+    if (!text) return alert("Answer cannot be empty.");
+
+    // find the question in local data
+    const question = (window.fullData || []).find(q => q.id === currentAnsweringID);
+    if (!question) return alert("Question not found.");
+
+    // add the answer to local data (store country)
+    const newAnswer = { user, country: userCountry, text, media };
+    question.answers.push(newAnswer);
+
+    // update UI under the question (append to the answers list)
+    const container = document.getElementById("questions");
+    const div = document.createElement("div");
+    div.className = "answerBox";
+    const answerFlag = userCountry ? (countriesWithEmojis[userCountry] || "") : "";
+    div.innerHTML = `<b>${user} ${answerFlag}:</b> ${text}<div class="media">${renderMedia(media)}</div>`;
+    container.appendChild(div);
+
+    // clear input fields and close modal
+    document.getElementById("aUser").value = "";
+    document.getElementById("aText").value = "";
+    document.getElementById("aMedia").value = "";
+        closeAnswerModal();
+
+        // POST answer to server (best-effort) including country
+        fetch('/api/addAnswer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentAnsweringID, user, country: userCountry, text, media })
+        }).then(res => res.json())
+            .then(resp => { if (resp && resp.status !== 'ok') console.warn('Server addAnswer response:', resp); })
+            .catch(err => console.warn('Failed to save answer to server', err));
+};
+
+// Simple edit/delete handlers (minimal, client-side)
+function editQuestion(id) {
+    const q = (window.fullData || []).find(x => x.id === id);
+    if (!q) return;
+    const updated = prompt("Edit question text:", q.text);
+    if (updated === null) return;
+    q.text = updated;
+    saveQuestionsToStorage();
+    loadQuestions(isTopicMode ? currentTopicResults : window.fullData);
+}
+
+function deleteQuestion(id) {
+    if (!confirm("Delete this question?")) return;
+    window.fullData = (window.fullData || []).filter(x => x.id !== id);
+    saveQuestionsToStorage();
+    loadQuestions(isTopicMode ? currentTopicResults : window.fullData);
+}
+
+function vote(id, amount) {
+    if (!currentUser) {
+        alert("You must be signed in to vote.");
+        return;
+    }
+
+    // Ensure the user has a vote history entry
+    if (!voteHistory[currentUser]) {
+        voteHistory[currentUser] = {};
+    }
+
+    // Check if this user already voted on this question
+    if (voteHistory[currentUser][id] !== undefined) {
+        alert("You have already voted on this post.");
+        return;
+    }
+
+    const q = window.fullData.find(x => x.id === id);
+    if (!q) return;
+
+    // Apply the vote
+    q.votes += amount;
+
+    // Record the vote
+    voteHistory[currentUser][id] = amount;
+    saveVoteHistory();
+
+    // Save & refresh UI
+    saveQuestionsToStorage();
+    loadQuestions(isTopicMode ? currentTopicResults : window.fullData);
+}
+
+// Open profile modal
+document.getElementById("profileBtn").addEventListener("click", () => {
+    updateProfileUI();
+    document.getElementById("profileModal").classList.remove("hidden");
+});
+
+function closeProfileModal() {
+    document.getElementById("profileModal").classList.add("hidden");
+}
+
+// USER LOGIN
+function loginUser() {
+    const name = document.getElementById("loginName").value.trim();
+    const country = (document.getElementById("countrySelect") && document.getElementById("countrySelect").value) || "";
+
+    if (!name) return alert("Enter a username.");
+    if (!country) return alert("Select your country.");
+
+    currentUser = name;
+    localStorage.setItem("tellus_currentUser", name);
+    localStorage.setItem("tellus_userCountry", country);
+    updateProfileUI();
+    closeProfileModal();
+}
+
+// USER LOGOUT
+function logoutUser() {
+    currentUser = "";
+    localStorage.removeItem("tellus_currentUser");
+    updateProfileUI();
+    closeProfileModal();
+}
+
+// Update modal UI depending on login state
+function updateProfileUI() {
+    const loggedIn = currentUser && currentUser.length > 0;
+
+    document.getElementById("profileLoggedOut").classList.toggle("hidden", loggedIn);
+    document.getElementById("profileLoggedIn").classList.toggle("hidden", !loggedIn);
+
+    if (loggedIn) {
+        const display = document.getElementById("displayUser");
+        const savedCountryName = localStorage.getItem("tellus_userCountry");
+        const emoji = savedCountryName ? (countriesWithEmojis[savedCountryName] || "") : "";
+        display.innerText = currentUser + (emoji ? " " + emoji : "");
+    }
+}
+
+// AUTO OPEN SIGN-IN WHEN APP LOADS
+window.addEventListener("load", () => {
+    if (!currentUser) {
+        updateProfileUI();
+        document.getElementById("profileModal").classList.remove("hidden");
+    }
+});
+</script>
+
+</body>
